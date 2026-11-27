@@ -12,6 +12,12 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 AREA_DATA = ROOT / "data" / "site-areas.json"
 EV_LINK = "/research/evidence/ev-0215-tithe-apportionment-john-williams-c1841/"
+# 27 Nov 2026 (cedwyn-arcade#2 findings 1, 2, 8): Arcade's own description, canonical URL and a no-JS fallback.
+ARCADE_DESCRIPTION = ("Cedwyn Arcade: the NFT flower gallery, paintings each linked to a Great House Farm (Tŷ Mawr), "
+                      "Llandough record, and the cyber games, in one page.")
+ARCADE_NOSCRIPT = ('<noscript><style>.arcade-loading{display:none!important}</style>'
+                   '<p class="note">Open directly: ' + '<a href="/nft-art/">NFT flower gallery</a> · '
+                   '<a href="/cyberspace/">Cyber games</a> · <a href="/garden/">Flower Garden</a></p></noscript>')
 
 def esc(v):
     return html.escape(str(v or ""), quote=True)
@@ -19,13 +25,13 @@ def esc(v):
 def a(href, label, cls=""):
     return '<a' + (' class="' + esc(cls) + '"' if cls else '') + ' href="' + esc(href) + '">' + esc(label) + '</a>'
 
-def shell(title, description, body):
+def shell(title, description, body, canonical=""):
     return '''<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="index,follow"><title>''' + esc(title) + ''' — Cedwyn</title>
-<meta name="description" content="''' + esc(description) + '''">
+<meta name="description" content="''' + esc(description) + '''">''' + ('<link rel="canonical" href="' + esc(canonical) + '">' if canonical else '') + '''
 <style>
 :root{color-scheme:light;--wiki-bg:#f8f9fa;--wiki-paper:#fff;--wiki-text:#202122;--wiki-muted:#54595d;--wiki-border:#a2a9b1;--wiki-soft-border:#c8ccd1;--wiki-link:#0645ad}
 html{background:var(--wiki-bg)}html[data-ghf-mode="night"]{--wiki-bg:#0f1115;--wiki-paper:#161a20;--wiki-text:#e8e8ee;--wiki-muted:#b6bdc8;--wiki-border:#4b5563;--wiki-soft-border:#303844;--wiki-link:#9cc8ff}body{margin:0;background:var(--wiki-bg);color:var(--wiki-text);font:14px/1.6 Arial,"Liberation Sans",sans-serif}
@@ -75,14 +81,14 @@ def render_area_index(doc):
     )
     return shell("%d page areas" % n, "A transparent index that groups %d source themes into %d visitor-facing areas and records parcel matching as pending source review." % (ns, n), body)
 
-def render_tabs(title, intro, tabs):
+def render_tabs(title, intro, tabs, description="", canonical=""):
     tab_html = ''.join('<button type="button" data-src="' + esc(src) + '" data-label="' + esc(label) + '" aria-pressed="' + ('true' if i == 0 else 'false') + '">' + esc(label) + '</button>' for i, (label, src) in enumerate(tabs))
     iframe = '<iframe class="frame" title="' + esc(title + " — " + tabs[0][0]) + '" src="' + esc(tabs[0][1]) + '" loading="lazy" referrerpolicy="same-origin"></iframe>'
     script = '''<script>
 (function(){var root=document.querySelector('[data-tabs]');if(!root)return;var frame=root.querySelector('iframe');root.querySelectorAll('button[data-src]').forEach(function(b){b.addEventListener('click',function(){var src=b.getAttribute('data-src');if(frame.getAttribute('src')!==src)frame.setAttribute('src',src);root.querySelectorAll('button[data-src]').forEach(function(x){x.setAttribute('aria-pressed',String(x===b))});frame.title=''' + json.dumps(title) + '''+' — '+b.getAttribute('data-label');});});})();
 </script>'''
     body = '<nav class="nav">' + a("/parcels/site-areas/", "All page areas") + a("/wiki/evidence/", "Evidence register") + '</nav><h1>' + esc(title) + '</h1>' + ('<p class="lede">' + esc(intro) + '</p>' if intro else '') + '<div data-tabs><div class="tabs" role="group" aria-label="' + esc(title + " views") + '">' + tab_html + '</div>' + iframe + '</div>' + script
-    return shell(title, intro, body)
+    return shell(title, description or intro, body, canonical)
 
 def insert_link(page_path, marker, label, href):
     if not page_path.exists():
@@ -129,8 +135,10 @@ def run(dist):
     arcade.write_text(render_tabs(
         "Arcade",
         "",
-        [("NFT flower gallery", "/nft-art/"), ("Cyber games", "/cyberspace/")]
-    ).replace('<div data-tabs>', '<p class="arcade-garden-link">' + a('/garden/', 'Open the Flower Garden') + '</p><div data-tabs>').replace('<iframe class="frame"', '<div class="arcade-loading" role="status">Loading the experience…</div><iframe class="frame"').replace('</body>', '''<script>(function(){var f=document.querySelector('iframe'),s=document.querySelector('.arcade-loading'),timer;function loading(){s.hidden=false;s.textContent='Loading the experience…';f.setAttribute('aria-busy','true');clearTimeout(timer);timer=setTimeout(function(){s.innerHTML='Still loading. <a target="_blank" rel="noopener">Open this experience directly</a>';s.querySelector('a').href=f.src;},15000);}f.addEventListener('load',function(){clearTimeout(timer);s.hidden=true;f.setAttribute('aria-busy','false');});new MutationObserver(function(ms){if(ms.some(function(m){return m.attributeName==='src'}))loading();}).observe(f,{attributes:true,attributeFilter:['src']});loading();})();</script></body>'''), encoding="utf-8")
+        [("NFT flower gallery", "/nft-art/"), ("Cyber games", "/cyberspace/")],
+        description=ARCADE_DESCRIPTION,
+        canonical="https://bucklerfamily.estate/arcade/"
+    ).replace('<div data-tabs>', ARCADE_NOSCRIPT + '<p class="arcade-garden-link">' + a('/garden/', 'Open the Flower Garden') + '</p><div data-tabs>').replace('<iframe class="frame"', '<div class="arcade-loading" role="status">Loading the experience…</div><iframe class="frame"').replace('</body>', '''<script>(function(){var f=document.querySelector('iframe'),s=document.querySelector('.arcade-loading'),timer;function loading(){s.hidden=false;s.textContent='Loading the experience…';f.setAttribute('aria-busy','true');clearTimeout(timer);timer=setTimeout(function(){s.innerHTML='Still loading. <a target="_blank" rel="noopener">Open this experience directly</a>';s.querySelector('a').href=f.src;},15000);}f.addEventListener('load',function(){clearTimeout(timer);s.hidden=true;f.setAttribute('aria-busy','false');});new MutationObserver(function(ms){if(ms.some(function(m){return m.attributeName==='src'}))loading();}).observe(f,{attributes:true,attributeFilter:['src']});loading();})();</script></body>'''), encoding="utf-8")
 
     reference = dist / "wiki" / "reference" / "index.html"
     reference.parent.mkdir(parents=True, exist_ok=True)
